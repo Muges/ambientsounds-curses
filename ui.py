@@ -63,6 +63,9 @@ class UI:
         self.screen.refresh()
 
     def end(self):
+        """
+        Stop the application
+        """
         # End curses
         curses.nocbreak()
         self.screen.keypad(0)
@@ -70,8 +73,10 @@ class UI:
         curses.endwin()
 
     def resize(self):
-        # Set some constants depending on the screen size
-
+        """
+        Method executed when the terminal is resized : set some
+        constants depending on the screen size
+        """
         # Screen size
         self.screenh, self.screenw = self.screen.getmaxyx()
         
@@ -95,6 +100,9 @@ class UI:
         self.slidew = self.screenw-2*self.hpadding-self.namesw-7
 
     def create_volume_slider(self, y, sound, index):
+        """
+        Creates a volume slider for the Volume object `sound`
+        """
         # Display the name of the sound
         if index == self.selection:
             # Highlight the name of the selected track
@@ -113,6 +121,9 @@ class UI:
         self.soundspad.addstr(y, self.slidex+slidewleft, "-"*slidewright)
 
     def update(self):
+        """
+        Uate the screen
+        """
         self.screen.clear()
         self.soundspad.clear()
 
@@ -140,6 +151,9 @@ class UI:
             return self.sounds[self.selection-1]
 
     def run(self, mastervolume):
+        """
+        Start the main loop
+        """
         self.mastervolume = mastervolume
         
         self.sounds = mastervolume.get_sounds()
