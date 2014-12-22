@@ -13,7 +13,7 @@ The program depends on :
 
 ## Manual
 
-- `Up`/`Down` to change select the master Volume or a track
+- `Up`/`Down` to select a track or a preset
 - `Left`/`Right` to change the volume of the selected track
 - `q` to quit
 

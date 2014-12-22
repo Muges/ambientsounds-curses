@@ -25,112 +25,212 @@
 
 import curses
 
-class SoundsPad:
+class OneLineWidget:
     """
-    Pad containing the list of tracks, and a volume sliders for each
-    one of them
+    Abstract class representing a one line widget
     """
-    def __init__(self):
-        # Width taken by the track titles
-        self.namesw = 0
-
-        # Width taken by the volume slider
-        self.slidew = 0
-
-        # Index of the selected volume slider
-        self.selection = 1
-        # First line of the sounds pad
-        self.top = 0
-        self.maxtop = 0
-
-        # Total height of the pad
-        self.height = 1
-
-    def get_selection(self):
+    def __init__(self, parent):
         """
-        Return the Volume object that is currently selected
+        Initialize the widget.
+
+        - parent is the curses.window object in which the widget will be
+          drawn
         """
-        if self.selection == 0:
-            return self.mastervolume
-        else:
-            return self.mastervolume.get_sound(self.selection-1)
+        self.parent = parent
 
-    def set_selection(self, index):
-        self.selection = max(0, min(index, len(self.mastervolume.get_sounds())))
-        self.top = max(0, min(self.selection - self.screenheight/2, self.maxtop))
+    def draw(self, y, width, selected=False):
+        """
+        Abstract method used to draw the widget.
 
-    def next_track(self):
-        self.set_selection(self.selection+1)
+        - y is the number of the line at which the widget will be drawn.            
+        - selected is a boolean indicating if the widget is selected if
+        the parent is a ScrollableList
+        """
+        raise NotImplementedError()
 
-    def previous_track(self):
-        self.set_selection(self.selection-1)
+    def on_key(self, c):
+        """
+        Method called when the user types the key c and the widget is
+        selected.
+        """
+        return
 
-    def start(self):
-        self.pad = curses.newpad(1,1)
-
-    def resize(self, height, width):
-        self.screenheight = height
+class VolumeWidget(OneLineWidget):
+    """
+    Widget used to set the volume of a Volume object
+    """
+    def __init__(self, parent, volume, namesw):
+        """
+        Initialize the object.
         
-        # Position of the sliders
-        self.slidex = self.namesw+5
-        
-        # Width of the sliders
-        self.slidew = width-self.namesw-7
-
-        self.pad.resize(self.height, width+1)
-        self.maxtop = max(0, self.height-height-1)
-        self.top = min(self.top, self.maxtop)
-
-    def run(self, mastervolume):
-        self.mastervolume = mastervolume
-        
-        sounds = mastervolume.get_sounds()
-        self.namesw = max(max([len(s.name) for s in sounds]), len(mastervolume.name))
-        self.height = len(sounds)+2
-
-    def create_volume_slider(self, y, sound, index):
+        - parent is the curses.window object in which the widget will be
+          drawn
+        - volume is a Volume object
+        - namesw is the width taken by the names of the Volume objects
         """
-        Creates a volume slider for the Volume object `sound`
-        """
-        # Display the name of the sound
-        if index == self.selection:
-            # Highlight the name of the selected track
+        OneLineWidget.__init__(self, parent)
+        self.volume = volume
+        self.namesw = namesw
+
+    def draw(self, y, width, selected=False):
+        # Highlight the name if the widget is selected
+        if selected:
             attribute = curses.A_REVERSE
         else:
             attribute = 0
 
-        self.pad.addstr(y, 0, " "+sound.name+" ", attribute)
+        # Draw the name
+        self.parent.addstr(y, 0, " "+self.volume.name+" ", attribute)
 
-        # Draw a volume slider : [ ####----- ]
-        self.pad.addstr(y, self.slidex-2, "[ ")
-        self.pad.addstr(y, self.slidex+self.slidew, " ]")
+        # Position and width of the slider
+        slidex = self.namesw+5
+        slidew = width-slidex-2-1
+        slidewleft = (self.volume.get_volume()*slidew)/100
+        slidewright = slidew-slidewleft
 
-        slidewleft = (sound.get_volume()*self.slidew)/100
-        slidewright = self.slidew-slidewleft
-        self.pad.addstr(y, self.slidex, "#"*slidewleft)
-        self.pad.addstr(y, self.slidex+slidewleft, "-"*slidewright)
+        # Draw the slider
+        self.parent.addstr(y, slidex-2, "[ ")
+        self.parent.addstr(y, slidex+slidew, " ]")
 
-    def update(self, stop, sleft, sbottom, sright):
+        self.parent.addstr(y, slidex, "#"*slidewleft)
+        self.parent.addstr(y, slidex+slidewleft, "-"*slidewright)
+
+    def on_key(self, c):
+        if c == curses.KEY_LEFT:
+            # Increase the volume
+            self.volume.inc_volume(-1)
+        elif c == curses.KEY_RIGHT:
+            # Decrease the volume
+            self.volume.inc_volume(1)
+
+class ScrollableList:
+    """
+    Object representing a list of OneLineWidgets that can be browsed and
+    scrolled through
+    """
+    def __init__(self):
+        self.set_widgets([])
+        
+        # Number of the line which is at the top of the widget (used for
+        # scrolling)
+        self.top = 0
+        
+        self.pad = curses.newpad(1,1)
+
+    def set_widgets(self, widgets, default=0):
+        self.widgets = widgets
+        self.set_selection(default)
+        self.height = len(widgets)
+
+    def get_selection(self):
+        try:
+            return self.widgets[self.selection]
+        except KeyError:
+            return None
+
+    def set_selection(self, selection):
         """
-        Update the pad
+        Set the selection, ensuring that the selected widget exists.
         """
+        # Ensure that the widget is in the list
+        selection = min(selection, len(self.widgets)-1)
+        
+        if selection < 0:
+            selection = 0
+        else:
+            # If the widget is None, find the first widget before the
+            # selection that is not None
+            while (selection >= 0 and self.widgets[selection] == None):
+                selection -= 1
+
+            if selection < 0:
+                # If there isn't one, find the first widget after the
+                # selection that is not None
+                selection = 0
+                while (selection < len(self.widgets) and self.widgets[selection] == None):
+                    selection += 1
+
+                # If there still isn't one (all the widgets are equal to
+                # None, set the selection to 0
+                if selection >= len(self.widgets):
+                    selection = 0
+
+        self.selection = selection
+
+    def select_previous_widget(self):
+        """
+        Select the first widget different to None preceding the current
+        selection
+        """
+        selection = self.selection-1
+        
+        while (selection >= 0 and self.widgets[selection] == None):
+            selection -= 1
+
+        self.set_selection(selection)
+
+    def select_next_widget(self):
+        """
+        Select the first widget different to None following the current
+        selection
+        """
+        selection = self.selection+1
+        
+        while (selection < len(self.widgets) and self.widgets[selection] == None):
+            selection += 1
+
+        self.set_selection(selection)
+
+    def draw(self, stop, sleft, sbottom, sright):
+        """
+        Draw the list in the portion of the screen delimited by the
+        coordinates (stop, sleft, sbottom, sright)
+        """
+        height = sbottom-stop
+        width = sright-sleft
+        
         self.pad.clear()
+        self.pad.resize(self.height, width)
+        
+        # Draw each widget
+        y = 0
+        for w in self.widgets:
+            if w != None:
+                w.draw(y, width, y == self.selection)
+            y += 1
 
-        # Draw the master volume slider
-        self.create_volume_slider(0, self.mastervolume, 0)
+        ptop = max(0, min(self.selection - height/2, self.height-height-1))
+        self.pad.refresh(ptop, 0, stop, sleft, sbottom, sright)
+            
+    def on_key(self, c):
+        if c == curses.KEY_DOWN:
+            self.select_next_widget()
+        elif c == curses.KEY_UP:
+            self.select_previous_widget()
+        else:
+            selection = self.get_selection()
+            if selection != None:
+                selection.on_key(c)
 
-        # Draw a slider for each sound
-        index = 1
-        for s in self.mastervolume.get_sounds():
-            self.create_volume_slider(index+1, s, index)
-            index += 1
+class VolumeList(ScrollableList):
+    """
+    List of VolumeWidgets
+    """
+    def __init__(self, mastervolume):
+        ScrollableList.__init__(self)
 
-        self.pad.refresh(self.top, 0, stop, sleft, sbottom, sright)
+        sounds = mastervolume.get_sounds()
+        namesw = max(max([len(s.name) for s in sounds]), len(mastervolume.name))
+        
+        widgets = []
+        widgets.append(VolumeWidget(self.pad, mastervolume, namesw))
+        widgets.append(None)
+        for sound in sounds:
+            widgets.append(VolumeWidget(self.pad, sound, namesw))
+
+        self.set_widgets(widgets, 2)
         
 class UI:
-    def __init__(self):
-        self.soundspad = SoundsPad()
-
     def start(self):
         """
         Start the application
@@ -141,8 +241,6 @@ class UI:
         curses.cbreak()
         self.screen.keypad(1)
         curses.curs_set(0)
-
-        self.soundspad.start()
         
         self.resize()
 
@@ -180,52 +278,40 @@ class UI:
             self.hpadding = 1
             self.vpadding = 1
 
-        self.soundspad.resize(self.screenh-2*self.vpadding-1, self.screenw-2*self.hpadding-1)
-
     def update(self):
         """
         Update the screen
         """
         self.screen.clear()
         self.screen.refresh()
-        self.soundspad.update(self.vpadding, self.hpadding,
-                              self.screenh-self.vpadding-1,
-                              self.screenw-self.hpadding-1)
+        
+        self.volumelist.draw(self.vpadding, self.hpadding,
+                             self.screenh-self.vpadding-1,
+                             self.screenw-self.hpadding-1)
 
     def run(self, mastervolume):
         """
         Start the main loop
         """
-        self.mastervolume = mastervolume
-        self.soundspad.run(mastervolume)
+        self.volumelist = VolumeList(mastervolume)
+        
         self.resize()
         self.update()
 
         while True:
-            # Wait for user input
+            # Wait for user input and handle it
             c = self.screen.getch()
             if c == ord('q'):
                 # Quit
                 self.end()
                 break
-            elif c == curses.KEY_DOWN:
-                # Select the next volume slider
-                self.soundspad.next_track()
-                self.update()
-            elif c == curses.KEY_UP:
-                # Select the previous volume slider
-                self.soundspad.previous_track()
-                self.update()
-            elif c == curses.KEY_LEFT:
-                # Increase the volume
-                self.soundspad.get_selection().inc_volume(-1)
-                self.update()
-            elif c == curses.KEY_RIGHT:
-                # Decrease the volume
-                self.soundspad.get_selection().inc_volume(1)
-                self.update()
             elif c == curses.KEY_RESIZE:
                 # The terminal has been resized, update the display
                 self.resize()
                 self.update()
+            else:
+                # Propagate the key to the VolumeList
+                self.volumelist.on_key(c)
+
+            self.update()
 

@@ -124,6 +124,7 @@ class Preset:
         a mastervolume object.
         """
         self.filename = filename
+        self.name = os.path.splitext(os.path.basename(filename))[0]
         self.master = master
         self.volumes = {}
 
