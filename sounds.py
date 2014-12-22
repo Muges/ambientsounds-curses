@@ -202,6 +202,12 @@ class MasterVolume(Volume):
         """
         return self.sounds
 
+    def get_sound(self, i):
+        """
+        Returns the i-th available track
+        """
+        return self.sounds[i]
+
     def get_presets(self):
         """
         Returns the list of available presets

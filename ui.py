@@ -25,21 +25,111 @@
 
 import curses
 
-class UI:
+class SoundsPad:
+    """
+    Pad containing the list of tracks, and a volume sliders for each
+    one of them
+    """
     def __init__(self):
-        # Width and height taken by the track titles
+        # Width taken by the track titles
         self.namesw = 0
-        self.namesh = 1
 
         # Width taken by the volume slider
         self.slidew = 0
 
         # Index of the selected volume slider
         self.selection = 1
-
         # First line of the sounds pad
-        self.soundstop = 0
-        self.maxsoundstop = 0
+        self.top = 0
+        self.maxtop = 0
+
+        # Total height of the pad
+        self.height = 1
+
+    def get_selection(self):
+        """
+        Return the Volume object that is currently selected
+        """
+        if self.selection == 0:
+            return self.mastervolume
+        else:
+            return self.mastervolume.get_sound(self.selection-1)
+
+    def set_selection(self, index):
+        self.selection = max(0, min(index, len(self.mastervolume.get_sounds())))
+        self.top = max(0, min(self.selection - self.screenheight/2, self.maxtop))
+
+    def next_track(self):
+        self.set_selection(self.selection+1)
+
+    def previous_track(self):
+        self.set_selection(self.selection-1)
+
+    def start(self):
+        self.pad = curses.newpad(1,1)
+
+    def resize(self, height, width):
+        self.screenheight = height
+        
+        # Position of the sliders
+        self.slidex = self.namesw+5
+        
+        # Width of the sliders
+        self.slidew = width-self.namesw-7
+
+        self.pad.resize(self.height, width+1)
+        self.maxtop = max(0, self.height-height-1)
+        self.top = min(self.top, self.maxtop)
+
+    def run(self, mastervolume):
+        self.mastervolume = mastervolume
+        
+        sounds = mastervolume.get_sounds()
+        self.namesw = max(max([len(s.name) for s in sounds]), len(mastervolume.name))
+        self.height = len(sounds)+2
+
+    def create_volume_slider(self, y, sound, index):
+        """
+        Creates a volume slider for the Volume object `sound`
+        """
+        # Display the name of the sound
+        if index == self.selection:
+            # Highlight the name of the selected track
+            attribute = curses.A_REVERSE
+        else:
+            attribute = 0
+
+        self.pad.addstr(y, 0, " "+sound.name+" ", attribute)
+
+        # Draw a volume slider : [ ####----- ]
+        self.pad.addstr(y, self.slidex-2, "[ ")
+        self.pad.addstr(y, self.slidex+self.slidew, " ]")
+
+        slidewleft = (sound.get_volume()*self.slidew)/100
+        slidewright = self.slidew-slidewleft
+        self.pad.addstr(y, self.slidex, "#"*slidewleft)
+        self.pad.addstr(y, self.slidex+slidewleft, "-"*slidewright)
+
+    def update(self, stop, sleft, sbottom, sright):
+        """
+        Update the pad
+        """
+        self.pad.clear()
+
+        # Draw the master volume slider
+        self.create_volume_slider(0, self.mastervolume, 0)
+
+        # Draw a slider for each sound
+        index = 1
+        for s in self.mastervolume.get_sounds():
+            self.create_volume_slider(index+1, s, index)
+            index += 1
+
+        self.pad.refresh(self.top, 0, stop, sleft, sbottom, sright)
+        
+class UI:
+    def __init__(self):
+        self.soundspad = SoundsPad()
 
     def start(self):
         """
@@ -51,8 +141,9 @@ class UI:
         curses.cbreak()
         self.screen.keypad(1)
         curses.curs_set(0)
-        self.soundspad = curses.newpad(1,1)
 
+        self.soundspad.start()
+        
         self.resize()
 
         # Display loading text
@@ -89,78 +180,25 @@ class UI:
             self.hpadding = 1
             self.vpadding = 1
 
-        self.soundspad.resize(self.namesh, self.screenw-2*self.hpadding+1)
-        self.maxsoundstop = max(0, self.namesh-self.screenh+2*self.vpadding)
-        self.soundstop = min(self.soundstop, self.maxsoundstop)
-
-        # Position of the sliders
-        self.slidex = self.namesw+5
-        
-        # Width of the sliders
-        self.slidew = self.screenw-2*self.hpadding-self.namesw-7
-
-    def create_volume_slider(self, y, sound, index):
-        """
-        Creates a volume slider for the Volume object `sound`
-        """
-        # Display the name of the sound
-        if index == self.selection:
-            # Highlight the name of the selected track
-            attribute = curses.A_REVERSE
-        else:
-            attribute = 0
-        self.soundspad.addstr(y, 0, " "+sound.name+" ", attribute)
-
-        # Draw a volume slider : [ ####----- ]
-        self.soundspad.addstr(y, self.slidex-2, "[ ")
-        self.soundspad.addstr(y, self.slidex+self.slidew, " ]")
-
-        slidewleft = (sound.get_volume()*self.slidew)/100
-        slidewright = self.slidew-slidewleft
-        self.soundspad.addstr(y, self.slidex, "#"*slidewleft)
-        self.soundspad.addstr(y, self.slidex+slidewleft, "-"*slidewright)
+        self.soundspad.resize(self.screenh-2*self.vpadding-1, self.screenw-2*self.hpadding-1)
 
     def update(self):
         """
-        Uate the screen
+        Update the screen
         """
         self.screen.clear()
-        self.soundspad.clear()
-
-        # Draw the master volume slider
-        self.create_volume_slider(0, self.mastervolume, 0)
-
-        # Draw a slider for each sound
-        index = 1
-        for s in self.sounds:
-            self.create_volume_slider(index+1, s, index)
-            index += 1
-
         self.screen.refresh()
-        self.soundspad.refresh(self.soundstop, 0,
-                               self.vpadding, self.hpadding,
-                               self.screenh-self.vpadding, self.screenw-self.hpadding)
-
-    def getSelection(self):
-        """
-        Return the Volume object that is currently selected
-        """
-        if self.selection == 0:
-            return self.mastervolume
-        else:
-            return self.sounds[self.selection-1]
+        self.soundspad.update(self.vpadding, self.hpadding,
+                              self.screenh-self.vpadding-1,
+                              self.screenw-self.hpadding-1)
 
     def run(self, mastervolume):
         """
         Start the main loop
         """
         self.mastervolume = mastervolume
-        
-        self.sounds = mastervolume.get_sounds()
-        self.namesw = max(max([len(s.name) for s in self.sounds]), len(self.mastervolume.name))
-        self.namesh = len(self.sounds)+2
+        self.soundspad.run(mastervolume)
         self.resize()
-
         self.update()
 
         while True:
@@ -172,24 +210,19 @@ class UI:
                 break
             elif c == curses.KEY_DOWN:
                 # Select the next volume slider
-                if self.selection < len(self.sounds):
-                    self.selection += 1
-                    if self.selection+1 >= self.soundstop+self.screenh-2*self.vpadding:
-                        self.soundstop += 1
-                    self.update()
+                self.soundspad.next_track()
+                self.update()
             elif c == curses.KEY_UP:
                 # Select the previous volume slider
-                if self.selection > 0:
-                    self.selection -= 1
-                    self.soundstop = min(self.soundstop, self.selection)
-                    self.update()
+                self.soundspad.previous_track()
+                self.update()
             elif c == curses.KEY_LEFT:
                 # Increase the volume
-                self.getSelection().inc_volume(-1)
+                self.soundspad.get_selection().inc_volume(-1)
                 self.update()
             elif c == curses.KEY_RIGHT:
                 # Decrease the volume
-                self.getSelection().inc_volume(1)
+                self.soundspad.get_selection().inc_volume(1)
                 self.update()
             elif c == curses.KEY_RESIZE:
                 # The terminal has been resized, update the display
