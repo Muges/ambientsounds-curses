@@ -26,14 +26,17 @@ import traceback
 from ui import UI
 from sounds import MasterVolume
 
-ui = UI()
+if __name__ == "__main__":
+    ui = UI()
 
-try:
-    ui.start()
+    try:
+        ui.start()
 
-    master = MasterVolume()
+        master = MasterVolume()
 
-    ui.run(master)
-except:
-    ui.end()
-    traceback.print_exc()
+        ui.run(master)
+    except SystemExit:
+        pass
+    except:
+        ui.end()
+        traceback.print_exc()

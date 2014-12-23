@@ -108,7 +108,7 @@ class Sound(Volume):
         if self.sound == None:
             # Load the sound and play it
             self.sound = pygame.mixer.Sound(self.filename)
-            self.sound.play(-1)
+            self.sound.play(-1, 0, 2000)
 
         # Set the volume
         self.sound.set_volume((self.mastervolume.get_volume()*self.get_volume())/10000.)
@@ -117,17 +117,16 @@ class Preset:
     """
     Stores volumes for each track
     """
-    def __init__(self, filename, master):
+    def __init__(self, master, filename):
         """
-        Initialise (without reading or creating it) a preset that
+        Initialize (without reading or creating it) a preset that
         will be stored in the file `filename`. master is a reference to
         a mastervolume object.
         """
-        self.filename = filename
-        self.name = os.path.splitext(os.path.basename(filename))[0]
         self.master = master
+        self.filename = filename
         self.volumes = {}
-
+        
     def apply(self):
         """
         Apply the preset
@@ -146,7 +145,8 @@ class Preset:
         for sound in self.master.get_sounds():
             volume = sound.get_volume()
             if volume == 0:
-                self.volumes.pop(sound.name)
+                if self.volumes.has_key(sound.name):
+                    self.volumes.pop(sound.name)
             else:
                 self.volumes[sound.name] = volume
 
@@ -172,30 +172,33 @@ class MasterVolume(Volume):
     """
 
     # Configuration directories
-    confdirs = [os.path.dirname(os.path.realpath(__file__)),
-                "/usr/share/ambientsounds/",
-                os.path.expanduser("~/.config/ambientsounds/")]
+    sounddirs = [os.path.join(os.path.dirname(os.path.realpath(__file__)), "sounds"),
+                 "/usr/share/ambientsounds/sounds",
+                 os.path.expanduser("~/.config/ambientsounds/sounds")]
 
     def __init__(self):
         Volume.__init__(self, "Volume", 100)
 
         # Get the sounds
         self.sounds = []
-        for dirname in self.confdirs:
-            sounddir = os.path.join(dirname, "sounds")
+        for sounddir in self.sounddirs:
             if os.path.isdir(sounddir):
                 for filename in os.listdir(sounddir):
                     self.sounds.append(Sound(os.path.join(sounddir, filename), self))
 
         pygame.mixer.set_num_channels(len(self.sounds))
 
-        # Get the presets
-        self.presets = []
-        for dirname in self.confdirs:
-            presetdir = os.path.join(dirname, "presets")
-            if os.path.isdir(presetdir):
-                for filename in os.listdir(presetdir):
-                    self.presets.append(Preset(os.path.join(presetdir, filename), self))
+        # Get the preset
+        self.presetpath = os.path.expanduser("~/.config/ambientsounds/preset.json")
+        if os.path.isfile(self.presetpath):
+            preset = Preset(self, self.presetpath)
+            preset.read()
+            preset.apply()
+
+    def save_preset(self):
+        preset = Preset(self, self.presetpath)
+        preset.save()
+        preset.write()
 
     def get_sounds(self):
         """
@@ -208,12 +211,6 @@ class MasterVolume(Volume):
         Returns the i-th available track
         """
         return self.sounds[i]
-
-    def get_presets(self):
-        """
-        Returns the list of available presets
-        """
-        return self.presets
 
     def _set_volume(self):
         """

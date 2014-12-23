@@ -11,10 +11,11 @@ The program depends on :
 - [pygame](http://www.pygame.org/news.html) to play the tracks
 - [mutagen](https://bitbucket.org/lazka/mutagen) to read the ogg vorbis tags
 
-## Manual
+## Shortcuts
 
-- `Up`/`Down` to select a track or a preset
-- `Left`/`Right` to change the volume of the selected track
+- `Up` and `Down` to select an item
+- `Left` and `Right` to change the volume of the selected track
+- `s` to save the current settings
 - `q` to quit
 
 ## Sounds

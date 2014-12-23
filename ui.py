@@ -24,6 +24,7 @@
 # SOFTWARE.
 
 import curses
+import sys
 
 class OneLineWidget:
     """
@@ -48,12 +49,12 @@ class OneLineWidget:
         """
         raise NotImplementedError()
 
-    def on_key(self, c):
+    def on_key(self, c, ui):
         """
         Method called when the user types the key c and the widget is
         selected.
         """
-        return
+        return False
 
 class VolumeWidget(OneLineWidget):
     """
@@ -95,14 +96,17 @@ class VolumeWidget(OneLineWidget):
         self.parent.addstr(y, slidex, "#"*slidewleft)
         self.parent.addstr(y, slidex+slidewleft, "-"*slidewright)
 
-    def on_key(self, c):
+    def on_key(self, c, ui):
         if c == curses.KEY_LEFT:
             # Increase the volume
             self.volume.inc_volume(-1)
         elif c == curses.KEY_RIGHT:
             # Decrease the volume
             self.volume.inc_volume(1)
-
+        else:
+            return False
+        return True
+                   
 class ScrollableList:
     """
     Object representing a list of OneLineWidgets that can be browsed and
@@ -125,7 +129,7 @@ class ScrollableList:
     def get_selection(self):
         try:
             return self.widgets[self.selection]
-        except KeyError:
+        except IndexError:
             return None
 
     def set_selection(self, selection):
@@ -190,7 +194,7 @@ class ScrollableList:
         width = sright-sleft
         
         self.pad.clear()
-        self.pad.resize(self.height, width)
+        self.pad.resize(max(1, self.height), max(1, width))
         
         # Draw each widget
         y = 0
@@ -202,7 +206,7 @@ class ScrollableList:
         ptop = max(0, min(self.selection - height/2, self.height-height-1))
         self.pad.refresh(ptop, 0, stop, sleft, sbottom, sright)
             
-    def on_key(self, c):
+    def on_key(self, c, ui):
         if c == curses.KEY_DOWN:
             self.select_next_widget()
         elif c == curses.KEY_UP:
@@ -210,7 +214,10 @@ class ScrollableList:
         else:
             selection = self.get_selection()
             if selection != None:
-                selection.on_key(c)
+                return selection.on_key(c, ui)
+            else:
+                return False
+        return True
 
 class VolumeList(ScrollableList):
     """
@@ -218,7 +225,8 @@ class VolumeList(ScrollableList):
     """
     def __init__(self, mastervolume):
         ScrollableList.__init__(self)
-
+        self.mastervolume = mastervolume
+        
         sounds = mastervolume.get_sounds()
         namesw = max(max([len(s.name) for s in sounds]), len(mastervolume.name))
         
@@ -229,6 +237,52 @@ class VolumeList(ScrollableList):
             widgets.append(VolumeWidget(self.pad, sound, namesw))
 
         self.set_widgets(widgets, 2)
+    
+    def on_key(self, c, ui):
+        if not ScrollableList.on_key(self, c, ui):
+            if c == ord("s"):
+                self.mastervolume.save_preset()
+            else:
+                return False
+        return True
+
+class MessageView:
+    """
+    Display a message at the center of the screen
+    """
+    def __init__(self, message):
+        """
+        Initialise the MessageView
+        
+        - message is a string
+        """
+        self.message = message.split("\n")
+        self.pad = curses.newpad(1,1)
+
+    def draw(self, stop, sleft, sbottom, sright):
+        """
+        Draw the message in the portion of the screen delimited by the
+        coordinates (stop, sleft, sbottom, sright)
+        """
+        height = sbottom-stop
+        width = sright-sleft
+        
+        self.pad.clear()
+        self.pad.resize(height, width)
+        
+        messageheight = len(self.message)
+
+        y = (height-messageheight)/2
+        for text in self.message:
+            x = (width-len(text))/2
+            self.pad.addstr(y, x, text)
+            y += 1
+
+        self.pad.refresh(0, 0, stop, sleft, sbottom, sright)
+
+class LoadingView(MessageView):
+    def __init__(self):
+        MessageView.__init__(self, "Loading sounds...")
         
 class UI:
     def start(self):
@@ -244,12 +298,10 @@ class UI:
         
         self.resize()
 
-        # Display loading text
-        text = "Loading sounds..."
-        x = (self.screenw-len(text))/2
-        y = self.screenh/2
-        self.screen.addstr(y, x, text)
-        self.screen.refresh()
+        self.loadingview = LoadingView()
+        self.current = self.loadingview
+        
+        self.update()
 
     def end(self):
         """
@@ -282,36 +334,43 @@ class UI:
         """
         Update the screen
         """
+        
         self.screen.clear()
         self.screen.refresh()
+        self.current.draw(self.vpadding, self.hpadding,
+                          self.screenh-self.vpadding-1,
+                          self.screenw-self.hpadding-1)
         
-        self.volumelist.draw(self.vpadding, self.hpadding,
-                             self.screenh-self.vpadding-1,
-                             self.screenw-self.hpadding-1)
-
     def run(self, mastervolume):
         """
         Start the main loop
         """
         self.volumelist = VolumeList(mastervolume)
         
+        self.current = self.volumelist
+        
         self.resize()
         self.update()
 
         while True:
             # Wait for user input and handle it
-            c = self.screen.getch()
-            if c == ord('q'):
-                # Quit
-                self.end()
-                break
-            elif c == curses.KEY_RESIZE:
-                # The terminal has been resized, update the display
-                self.resize()
-                self.update()
-            else:
-                # Propagate the key to the VolumeList
-                self.volumelist.on_key(c)
-
+            self.on_key(self.screen.getch(), self)
             self.update()
+    
+    def on_key(self, c, ui):
+        """
+        Callback called when a key is pressed
+        """
+        if c == ord('q'):
+            # Quit
+            self.end()
+            sys.exit(0)
+        elif c == curses.KEY_HOME:
+            self.current = self.volumelist
+        elif c == curses.KEY_RESIZE:
+            # The terminal has been resized, update the display
+            self.resize()
+        else:
+            # Propagate the key to the current view
+            self.current.on_key(c, ui)
 
