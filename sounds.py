@@ -106,12 +106,14 @@ class Sound(Volume):
         set_volume method.
         """
         if self.sound == None:
-            # Load the sound and play it
-            self.sound = pygame.mixer.Sound(self.filename)
-            self.sound.play(-1, 0, 2000)
-
-        # Set the volume
-        self.sound.set_volume((self.mastervolume.get_volume()*self.get_volume())/10000.)
+            if self.get_volume() > 0:
+                # Load the sound and play it
+                self.sound = pygame.mixer.Sound(self.filename)
+                self.sound.set_volume((self.mastervolume.get_volume()*self.get_volume())/10000.)
+                self.sound.play(-1, 0, 2000)
+        else:
+            # Set the volume
+            self.sound.set_volume((self.mastervolume.get_volume()*self.get_volume())/10000.)
 
 class Preset:
     """
@@ -163,6 +165,8 @@ class Preset:
         Write the preset to the file
         """
         # TODO : handle errors
+        if not os.path.exists(os.path.dirname(self.filename)):
+            os.makedirs(os.path.dirname(self.filename))
         with open(self.filename, "w") as f:
             json.dump(self.volumes, f)
 
