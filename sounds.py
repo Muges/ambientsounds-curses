@@ -188,7 +188,8 @@ class MasterVolume(Volume):
         for sounddir in self.sounddirs:
             if os.path.isdir(sounddir):
                 for filename in os.listdir(sounddir):
-                    self.sounds.append(Sound(os.path.join(sounddir, filename), self))
+                    if os.path.splitext(filename)[1] == ".ogg":
+                        self.sounds.append(Sound(os.path.join(sounddir, filename), self))
 
         pygame.mixer.set_num_channels(len(self.sounds))
 
