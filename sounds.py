@@ -93,12 +93,27 @@ class Sound(Volume):
             name, ext = os.path.splitext(basename)
         Volume.__init__(self, name)
 
+        try:
+            self.index = int(tags["tracknumber"][0])
+        except KeyError:
+            self.index = 0
+
         # Link with the MasterVolume object
         self.mastervolume = mastervolume
 
         # The pygame.mixer.Sound object (only loaded when necessary)
         self.sound = None
-        
+    
+    def __cmp__(self, other):
+        """
+        Comparison function (used to sort lexicograohically by
+        (index, name)
+        """
+        if self.index == other.index:
+            return cmp(self.name, other.name)
+        else:
+            return cmp(self.index, other.index)
+    
     def _set_volume(self):
         """
         Set the volume of the pygame.mixer.Sound object (this method
@@ -191,6 +206,8 @@ class MasterVolume(Volume):
                     if os.path.splitext(filename)[1] == ".ogg":
                         self.sounds.append(Sound(os.path.join(sounddir, filename), self))
 
+        self.sounds.sort()
+        
         pygame.mixer.set_num_channels(len(self.sounds))
 
         # Get the preset
