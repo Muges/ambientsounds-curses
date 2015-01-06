@@ -312,6 +312,15 @@ class UI:
         self.screen.keypad(0)
         curses.echo()
         curses.endwin()
+    
+    def fatal_error(self, error):
+        """
+        Prints an error string to stderr then exits the application
+        """
+        self.end()
+        sys.stderr.write("Error: " + error + "\n")
+        sys.stderr.flush()
+        sys.exit(1)
 
     def resize(self):
         """
@@ -345,6 +354,9 @@ class UI:
         """
         Start the main loop
         """
+        if len(mastervolume.get_sounds()) == 0:
+        	self.fatal_error("no sounds found")
+        
         self.volumelist = VolumeList(mastervolume)
         
         self.current = self.volumelist
