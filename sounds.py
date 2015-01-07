@@ -196,7 +196,7 @@ class MasterVolume(Volume):
                  os.path.expanduser("~/.config/ambientsounds/sounds")]
 
     def __init__(self):
-        Volume.__init__(self, "Volume", 100)
+        Volume.__init__(self, "Master", 100)
 
         # Get the sounds
         self.sounds = []
