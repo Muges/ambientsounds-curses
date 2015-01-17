@@ -97,16 +97,18 @@ class VolumeWidget(OneLineWidget):
         self.parent.addstr(y, slidex+slidewleft, "-"*slidewright)
 
     def on_key(self, c, ui):
-        if c == curses.KEY_LEFT:
+        if c in (curses.KEY_LEFT, ord('-')):
             # Increase the volume
             self.volume.inc_volume(-1)
-        elif c == curses.KEY_RIGHT:
+        elif c in (curses.KEY_RIGHT, ord('+')):
             # Decrease the volume
             self.volume.inc_volume(1)
+        elif c == ord('m'):
+        	self.volume.set_volume(0)
         else:
             return False
         return True
-                   
+
 class ScrollableList:
     """
     Object representing a list of OneLineWidgets that can be browsed and
@@ -185,6 +187,12 @@ class ScrollableList:
 
         self.set_selection(selection)
 
+    def select_first_widget(self):
+        self.set_selection(0)
+
+    def select_last_widget(self):
+        self.set_selection(len(self.widgets) - 1)
+
     def draw(self, stop, sleft, sbottom, sright):
         """
         Draw the list in the portion of the screen delimited by the
@@ -211,6 +219,10 @@ class ScrollableList:
             self.select_next_widget()
         elif c == curses.KEY_UP:
             self.select_previous_widget()
+        elif c == curses.KEY_PPAGE: # page up
+        	self.select_first_widget()
+        elif c == curses.KEY_NPAGE: # page down
+            self.select_last_widget()
         else:
             selection = self.get_selection()
             if selection != None:
