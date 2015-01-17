@@ -43,7 +43,7 @@ class OneLineWidget:
         """
         Abstract method used to draw the widget.
 
-        - y is the number of the line at which the widget will be drawn.            
+        - y is the number of the line at which the widget will be drawn.
         - selected is a boolean indicating if the widget is selected if
         the parent is a ScrollableList
         """
@@ -63,7 +63,7 @@ class VolumeWidget(OneLineWidget):
     def __init__(self, parent, volume, namesw):
         """
         Initialize the object.
-        
+
         - parent is the curses.window object in which the widget will be
           drawn
         - volume is a Volume object
@@ -104,7 +104,8 @@ class VolumeWidget(OneLineWidget):
             # Decrease the volume
             self.volume.inc_volume(1)
         elif c == ord('m'):
-        	self.volume.set_volume(0)
+            # Mute
+            self.volume.set_volume(0)
         else:
             return False
         return True
@@ -116,11 +117,11 @@ class ScrollableList:
     """
     def __init__(self):
         self.set_widgets([])
-        
+
         # Number of the line which is at the top of the widget (used for
         # scrolling)
         self.top = 0
-        
+
         self.pad = curses.newpad(1,1)
 
     def set_widgets(self, widgets, default=0):
@@ -140,7 +141,7 @@ class ScrollableList:
         """
         # Ensure that the widget is in the list
         selection = min(selection, len(self.widgets)-1)
-        
+
         if selection < 0:
             selection = 0
         else:
@@ -169,7 +170,7 @@ class ScrollableList:
         selection
         """
         selection = self.selection-1
-        
+
         while (selection >= 0 and self.widgets[selection] == None):
             selection -= 1
 
@@ -181,7 +182,7 @@ class ScrollableList:
         selection
         """
         selection = self.selection+1
-        
+
         while (selection < len(self.widgets) and self.widgets[selection] == None):
             selection += 1
 
@@ -200,10 +201,10 @@ class ScrollableList:
         """
         height = sbottom-stop
         width = sright-sleft
-        
+
         self.pad.clear()
         self.pad.resize(max(1, self.height), max(1, width))
-        
+
         # Draw each widget
         y = 0
         for w in self.widgets:
@@ -213,14 +214,14 @@ class ScrollableList:
 
         ptop = max(0, min(self.selection - height/2, self.height-height-1))
         self.pad.refresh(ptop, 0, stop, sleft, sbottom, sright)
-            
+
     def on_key(self, c, ui):
         if c == curses.KEY_DOWN:
             self.select_next_widget()
         elif c == curses.KEY_UP:
             self.select_previous_widget()
         elif c == curses.KEY_PPAGE: # page up
-        	self.select_first_widget()
+            self.select_first_widget()
         elif c == curses.KEY_NPAGE: # page down
             self.select_last_widget()
         else:
@@ -238,10 +239,10 @@ class VolumeList(ScrollableList):
     def __init__(self, mastervolume):
         ScrollableList.__init__(self)
         self.mastervolume = mastervolume
-        
+
         sounds = mastervolume.get_sounds()
         namesw = max(max([len(s.name) for s in sounds]), len(mastervolume.name))
-        
+
         widgets = []
         widgets.append(VolumeWidget(self.pad, mastervolume, namesw))
         widgets.append(None)
@@ -249,7 +250,7 @@ class VolumeList(ScrollableList):
             widgets.append(VolumeWidget(self.pad, sound, namesw))
 
         self.set_widgets(widgets, 2)
-    
+
     def on_key(self, c, ui):
         if not ScrollableList.on_key(self, c, ui):
             if c == ord("s"):
@@ -265,7 +266,7 @@ class MessageView:
     def __init__(self, message):
         """
         Initialise the MessageView
-        
+
         - message is a string
         """
         self.message = message.split("\n")
@@ -278,10 +279,10 @@ class MessageView:
         """
         height = sbottom-stop
         width = sright-sleft
-        
+
         self.pad.clear()
         self.pad.resize(height, width)
-        
+
         messageheight = len(self.message)
 
         y = (height-messageheight)/2
@@ -295,7 +296,7 @@ class MessageView:
 class LoadingView(MessageView):
     def __init__(self):
         MessageView.__init__(self, "Loading sounds...")
-        
+
 class UI:
     def start(self):
         """
@@ -307,12 +308,12 @@ class UI:
         curses.cbreak()
         self.screen.keypad(1)
         curses.curs_set(0)
-        
+
         self.resize()
 
         self.loadingview = LoadingView()
         self.current = self.loadingview
-        
+
         self.update()
 
     def end(self):
@@ -324,7 +325,7 @@ class UI:
         self.screen.keypad(0)
         curses.echo()
         curses.endwin()
-    
+
     def fatal_error(self, error):
         """
         Prints an error string to stderr then exits the application
@@ -341,7 +342,7 @@ class UI:
         """
         # Screen size
         self.screenh, self.screenw = self.screen.getmaxyx()
-        
+
         # Horizontal and vertical padding (space between the edge of the
         # terminal and the text)
         if self.screenh > 13 and self.screenw > 60:
@@ -355,24 +356,24 @@ class UI:
         """
         Update the screen
         """
-        
+
         self.screen.clear()
         self.screen.refresh()
         self.current.draw(self.vpadding, self.hpadding,
                           self.screenh-self.vpadding-1,
                           self.screenw-self.hpadding-1)
-        
+
     def run(self, mastervolume):
         """
         Start the main loop
         """
         if len(mastervolume.get_sounds()) == 0:
-        	self.fatal_error("no sounds found")
-        
+            self.fatal_error("no sounds found")
+
         self.volumelist = VolumeList(mastervolume)
-        
+
         self.current = self.volumelist
-        
+
         self.resize()
         self.update()
 
@@ -380,7 +381,7 @@ class UI:
             # Wait for user input and handle it
             self.on_key(self.screen.getch(), self)
             self.update()
-    
+
     def on_key(self, c, ui):
         """
         Callback called when a key is pressed
