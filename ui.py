@@ -195,7 +195,7 @@ class ScrollableList:
 
     def draw(self, stop, sleft, sbottom, sright):
         """
-        Draw the list in the portion of the scree n delimited by the
+        Draw the list in the portion of the screen delimited by the
         coordinates (stop, sleft, sbottom, sright)
         """
         height = sbottom-stop
